@@ -2,17 +2,16 @@
 
 Shared-hosting friendly Matomo connector for Drag & Drop Analytics.
 
-This connector runs in the customer's infrastructure. It lets Drag & Drop Analytics query local Matomo MySQL metadata without sending database credentials to the SaaS backend.
+This connector runs in the customer's infrastructure. It lets Drag & Drop Analytics query local Matomo MySQL metadata and execute signed read-only query plans without sending database credentials to the SaaS backend.
 
 ## Status
 
-Early scaffold. Implemented endpoints:
+Implemented endpoints:
 
 - `GET /v1/health`
 - `GET /v1/capabilities`
 - `POST /v1/catalog`
-
-Query execution is intentionally not implemented yet.
+- `POST /v1/query`
 
 ## Requirements
 
@@ -59,6 +58,41 @@ The connector validates:
 - HMAC signature
 
 Nonce replay persistence is not implemented in this scaffold yet.
+
+## Query Endpoint
+
+`POST /v1/query` executes a signed Drag & Drop Analytics query plan:
+
+```json
+{
+  "operation": "query",
+  "providerKey": "matomo_mysql",
+  "queryPlan": {
+    "type": "matomo.mysql.queryPlan.v1",
+    "queries": {
+      "rows": { "sql": "SELECT ... LIMIT 100 OFFSET 0", "params": [] },
+      "count": { "sql": "SELECT COUNT(*) AS totalRows FROM (...)", "params": [] },
+      "totals": { "sql": "SELECT ...", "params": [] }
+    },
+    "limits": {
+      "timeoutMs": 35000,
+      "maxRows": 400
+    }
+  }
+}
+```
+
+The connector does not build Matomo SQL. Drag & Drop Analytics builds the query plan, and the connector only executes validated read queries.
+
+Query safety gates:
+
+- accepted plan type: `matomo.mysql.queryPlan.v1`
+- only `SELECT` statements
+- no semicolons, SQL comments, multi-statements, writes, DDL, `UNION`, or file operations
+- allowed tables only: `matomo_log_link_visit_action`, `matomo_log_visit`, `matomo_log_action`, `matomo_site`, `information_schema.COLUMNS`
+- placeholder count must match bound parameters
+- row query must end with `LIMIT n OFFSET n`
+- `LIMIT` must not exceed `max_query_rows`
 
 ## Local Development
 

@@ -6,6 +6,7 @@ use DDA\MatomoConnector\Auth\HmacAuthenticator;
 use DDA\MatomoConnector\Http\JsonResponse;
 use DDA\MatomoConnector\Http\Request;
 use DDA\MatomoConnector\Matomo\MatomoCatalogService;
+use DDA\MatomoConnector\Matomo\MatomoQueryService;
 use DDA\MatomoConnector\Support\Config;
 
 spl_autoload_register(function (string $class): void {
@@ -47,7 +48,7 @@ try {
             'connector' => 'matomo-php',
             'version' => '0.1.0',
             'supportsCatalog' => true,
-            'supportsQuery' => false,
+            'supportsQuery' => true,
             'supportsSites' => true,
             'supportsSqlTemplates' => false,
             'maxLimit' => 400,
@@ -61,9 +62,16 @@ try {
         return;
     }
 
+    if ($method === 'POST' && $path === '/v1/query') {
+        JsonResponse::send((new MatomoQueryService($config))->execute($request->json()));
+        return;
+    }
+
     JsonResponse::send(['message' => 'Not found.'], 404);
 } catch (InvalidArgumentException $error) {
     JsonResponse::send(['message' => $error->getMessage()], 400);
+} catch (PDOException $error) {
+    JsonResponse::send(['message' => 'Connector query failed.'], 400);
 } catch (RuntimeException $error) {
     JsonResponse::send(['message' => $error->getMessage()], 403);
 } catch (Throwable $error) {
