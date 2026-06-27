@@ -53,5 +53,11 @@ final class HmacAuthenticator
         if (!hash_equals($expectedSignature, $signature)) {
             throw new \RuntimeException('Invalid connector signature.');
         }
+
+        $nonceStorePath = $this->config->string('nonce_store_path');
+        if ($nonceStorePath !== '') {
+            $nonceTtl = $this->config->int('nonce_store_ttl_seconds', $tolerance);
+            (new FileNonceStore($nonceStorePath, max(1, $nonceTtl)))->remember($connectorId, $nonce, $requestTime);
+        }
     }
 }

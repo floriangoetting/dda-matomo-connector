@@ -26,7 +26,8 @@ Implemented endpoints:
 2. Point the web root to `public/`.
 3. Copy `config.example.php` to `config.php`.
 4. Configure connector id, shared secret, and Matomo database credentials.
-5. In Drag & Drop Analytics, create a Matomo HTTP Connector Data Source with the connector URL, connector id, and shared secret.
+5. Ensure the configured nonce storage directory is writable by PHP.
+6. In Drag & Drop Analytics, create a Matomo HTTP Connector Data Source with the connector URL, connector id, and shared secret.
 
 ## Security Model
 
@@ -56,8 +57,12 @@ The connector validates:
 - connector id
 - timestamp tolerance
 - HMAC signature
+- nonce replay protection when `nonce_store_path` is configured
 
-Nonce replay persistence is not implemented in this scaffold yet.
+For replay protection, configure `nonce_store_path` to a JSON file in a
+directory writable by PHP. The connector locks this file while pruning expired
+nonces and storing the current nonce. Set the value to an empty string only when
+the hosting environment cannot provide a writable local path.
 
 ## Query Endpoint
 
