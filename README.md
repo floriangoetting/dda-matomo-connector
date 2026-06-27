@@ -35,6 +35,11 @@ directory, and writes `config.php`. Once `config.php` exists, the setup wizard i
 disabled. Manual setup is still possible by copying `config.example.php` to
 `config.php` and editing the values directly.
 
+On Apache shared hosting, keep `public/.htaccess` uploaded. It sets
+`index.php` as the default entry point and rewrites routes such as `/setup` and
+`/v1/health` to the connector front controller. Without it, only direct URLs
+such as `/index.php` may work.
+
 ## Security Model
 
 Drag & Drop Analytics signs connector requests with HMAC-SHA256.
