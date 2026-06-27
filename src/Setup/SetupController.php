@@ -27,7 +27,7 @@ final class SetupController
         $this->renderForm();
     }
 
-    private function renderForm(array $values = [], string $error = ''): void
+    private function renderForm(array $values = [], string $error = '', string $success = ''): void
     {
         $connectorId = $values['connector_id'] ?? 'conn_' . bin2hex(random_bytes(8));
         $sharedSecret = $values['shared_secret'] ?? bin2hex(random_bytes(32));
@@ -35,7 +35,8 @@ final class SetupController
         $storagePath = $values['storage_path'] ?? $this->basePath . '/storage/nonces.json';
 
         $errorHtml = $error === '' ? '' : '<div class="alert alert-danger">' . $this->escape($error) . '</div>';
-        $body = $errorHtml . '
+        $successHtml = $success === '' ? '' : '<div class="alert alert-success">' . $this->escape($success) . '</div>';
+        $body = $errorHtml . $successHtml . '
             <form method="post" class="setup-form">
                 <h2>Connector</h2>
                 ' . $this->input('connector_id', 'Connector ID', $connectorId) . '
@@ -51,7 +52,10 @@ final class SetupController
                 <h2>Updates</h2>
                 ' . $this->input('update_manifest_url', 'Update Manifest URL', $values['update_manifest_url'] ?? '') . '
                 <label class="checkbox"><input type="checkbox" name="allow_self_update" value="1"> Allow this connector to apply verified ZIP updates</label>
-                <button type="submit">Create config.php</button>
+                <div class="actions">
+                    <button type="submit" name="setup_action" value="test">Test Matomo Connection</button>
+                    <button type="submit" name="setup_action" value="save">Create config.php</button>
+                </div>
             </form>';
 
         $this->renderPage('DDA Matomo Connector Setup', $body);
@@ -72,10 +76,15 @@ final class SetupController
             'update_manifest_url' => $this->post('update_manifest_url'),
             'allow_self_update' => ($_POST['allow_self_update'] ?? '') === '1',
         ];
+        $action = $this->post('setup_action') === 'test' ? 'test' : 'save';
 
         try {
             $this->validate($values);
             $this->testConnection($values);
+            if ($action === 'test') {
+                $this->renderForm($values, '', 'Matomo database connection was tested successfully.');
+                return;
+            }
             $this->prepareStorage($values['storage_path']);
 
             ConfigWriter::write($this->configPath, [
@@ -104,7 +113,7 @@ final class SetupController
         }
 
         $this->renderPage('Setup complete', '
-            <div class="alert alert-success">config.php was created successfully.</div>
+            <div class="alert alert-success">Matomo database connection was tested successfully. config.php was created.</div>
             <dl>
                 <dt>Connector URL</dt><dd>' . $this->escape($this->connectorUrl()) . '</dd>
                 <dt>Connector ID</dt><dd><code>' . $this->escape($values['connector_id']) . '</code></dd>
@@ -186,7 +195,9 @@ final class SetupController
             h1{margin-top:0;font-size:28px} h2{margin-top:28px;font-size:18px}
             label{display:block;margin:14px 0;font-weight:600} input{box-sizing:border-box;width:100%;padding:10px;margin-top:6px;border:1px solid #b8c0cc;border-radius:6px;font:inherit}
             .checkbox{font-weight:400}.checkbox input{width:auto;margin-right:8px}.alert{padding:12px 14px;border-radius:6px;margin-bottom:20px}.alert-danger{background:#fde8e8;color:#9b1c1c}.alert-success{background:#e6f4ea;color:#1e7e34}
+            .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
             button{padding:10px 16px;border:0;border-radius:6px;background:#215cff;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+            button[name="setup_action"][value="test"]{background:#eef2f7;color:#1f2933;border:1px solid #b8c0cc}
             code{background:#eef2f7;padding:2px 5px;border-radius:4px} dd{margin:6px 0 14px}
         </style></head><body><main><h1>' . $this->escape($title) . '</h1>' . $body . '<footer><p>DDA Matomo Connector ' . Version::CONNECTOR . '</p></footer></main></body></html>';
     }

@@ -30,10 +30,12 @@ Implemented endpoints:
 5. Store the generated connector id, shared secret, and admin token.
 6. In Drag & Drop Analytics, create a Matomo HTTP Connector Data Source with the connector URL, connector id, and shared secret.
 
-The setup wizard tests the Matomo MySQL connection, creates the nonce storage
-directory, and writes `config.php`. Once `config.php` exists, the setup wizard is
-disabled. Manual setup is still possible by copying `config.example.php` to
-`config.php` and editing the values directly.
+The setup wizard can test the Matomo MySQL connection before saving. It also
+tests the connection again when creating `config.php`, creates the nonce storage
+directory, and writes the config file only after the connection succeeds. Once
+`config.php` exists, the setup wizard is disabled. Manual setup is still
+possible by copying `config.example.php` to `config.php` and editing the values
+directly.
 
 On Apache shared hosting, keep `public/.htaccess` uploaded. It sets
 `index.php` as the default entry point and rewrites routes such as `/setup` and
