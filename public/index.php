@@ -8,6 +8,10 @@ use DDA\MatomoConnector\Http\Request;
 use DDA\MatomoConnector\Matomo\MatomoCatalogService;
 use DDA\MatomoConnector\Matomo\MatomoQueryService;
 use DDA\MatomoConnector\Support\Config;
+use DDA\MatomoConnector\Support\Version;
+use DDA\MatomoConnector\Setup\SetupController;
+use DDA\MatomoConnector\Update\UpdateController;
+use DDA\MatomoConnector\Update\UpdateService;
 
 spl_autoload_register(function (string $class): void {
     $prefix = 'DDA\\MatomoConnector\\';
@@ -25,18 +29,45 @@ spl_autoload_register(function (string $class): void {
 $request = new Request();
 
 try {
-    $config = Config::load(dirname(__DIR__) . '/config.php');
+    $basePath = dirname(__DIR__);
+    $configPath = $basePath . '/config.php';
     $requestPath = rtrim($request->path(), '/');
     $v1Position = strpos($requestPath, '/v1');
     $path = $v1Position === false ? $requestPath : substr($requestPath, $v1Position);
+    $isSetupPath = $requestPath === '' || $requestPath === '/' || str_ends_with($requestPath, '/setup');
+    $isAdminUpdatePath = $requestPath === '/admin/update' || str_ends_with($requestPath, '/admin/update');
     $method = $request->method();
+
+    if (!is_file($configPath)) {
+        if (($method === 'GET' || $method === 'POST') && ($isSetupPath || !str_starts_with($path, '/v1'))) {
+            (new SetupController($basePath, $configPath))->handle($method);
+            return;
+        }
+        if ($method === 'GET' && $path === '/v1/health') {
+            JsonResponse::send([
+                'status' => 'setup_required',
+                'connector' => 'matomo-php',
+                'version' => Version::CONNECTOR,
+            ], 503);
+            return;
+        }
+        JsonResponse::send(['message' => 'Connector setup is required.'], 503);
+        return;
+    }
+
+    $config = Config::load($configPath);
 
     if ($method === 'GET' && $path === '/v1/health') {
         JsonResponse::send([
             'status' => 'ok',
             'connector' => 'matomo-php',
-            'version' => '0.1.0',
+            'version' => Version::CONNECTOR,
         ]);
+        return;
+    }
+
+    if (($method === 'GET' || $method === 'POST') && $isAdminUpdatePath) {
+        (new UpdateController($config, $basePath))->handle($method);
         return;
     }
 
@@ -46,13 +77,20 @@ try {
         JsonResponse::send([
             'providerKey' => 'matomo_mysql',
             'connector' => 'matomo-php',
-            'version' => '0.1.0',
+            'version' => Version::CONNECTOR,
             'supportsCatalog' => true,
             'supportsQuery' => true,
             'supportsSites' => true,
+            'supportsUpdateCheck' => true,
+            'supportsSelfUpdate' => $config->bool('allow_self_update', false),
             'supportsSqlTemplates' => false,
             'maxLimit' => 400,
         ]);
+        return;
+    }
+
+    if ($method === 'GET' && $path === '/v1/update-check') {
+        JsonResponse::send((new UpdateService($config, $basePath))->check());
         return;
     }
 

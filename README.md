@@ -10,6 +10,7 @@ Implemented endpoints:
 
 - `GET /v1/health`
 - `GET /v1/capabilities`
+- `GET /v1/update-check`
 - `POST /v1/catalog`
 - `POST /v1/query`
 
@@ -24,10 +25,15 @@ Implemented endpoints:
 
 1. Upload this repository to your web hosting account.
 2. Point the web root to `public/`.
-3. Copy `config.example.php` to `config.php`.
-4. Configure connector id, shared secret, and Matomo database credentials.
-5. Ensure the configured nonce storage directory is writable by PHP.
+3. Open the connector URL in a browser.
+4. Complete the setup wizard.
+5. Store the generated connector id, shared secret, and admin token.
 6. In Drag & Drop Analytics, create a Matomo HTTP Connector Data Source with the connector URL, connector id, and shared secret.
+
+The setup wizard tests the Matomo MySQL connection, creates the nonce storage
+directory, and writes `config.php`. Once `config.php` exists, the setup wizard is
+disabled. Manual setup is still possible by copying `config.example.php` to
+`config.php` and editing the values directly.
 
 ## Security Model
 
@@ -98,6 +104,56 @@ Query safety gates:
 - placeholder count must match bound parameters
 - row query must end with `LIMIT n OFFSET n`
 - `LIMIT` must not exceed `max_query_rows`
+
+## Setup UI
+
+When `config.php` is missing, `GET /setup` shows a browser-based setup wizard.
+The wizard writes a PHP config file with:
+
+- connector id
+- shared secret
+- admin token hash
+- nonce storage path
+- Matomo database connection
+- optional update manifest URL
+- optional self-update permission
+
+The admin token is only shown during setup. It is required for browser-based
+update checks at `GET /admin/update`.
+
+## Updates
+
+The connector exposes its running version through `/v1/health`,
+`/v1/capabilities`, and `/v1/update-check`.
+
+`GET /v1/update-check` is HMAC-authenticated and intended for Drag & Drop
+Analytics. It returns the current version, the latest version from the configured
+manifest, and whether an update is available.
+
+Configure `update_manifest_url` with a JSON manifest:
+
+```json
+{
+  "version": "0.3.0",
+  "minimumPhpVersion": "8.1.0",
+  "downloadUrl": "https://updates.example.com/dda-matomo-connector-0.3.0.zip",
+  "sha256": "hex-encoded-sha256",
+  "releaseNotesUrl": "https://updates.example.com/dda-matomo-connector/0.3.0"
+}
+```
+
+Browser-based update checks are available at `GET /admin/update` and require the
+admin token. Applying updates requires:
+
+- `allow_self_update` set to `true`
+- PHP `ZipArchive`
+- writable connector files
+- a manifest with `downloadUrl` and `sha256`
+
+The updater verifies the ZIP hash, extracts the package, backs up the current
+runtime files under `storage/updates/`, and replaces `public/`, `src/`,
+`composer.json`, `README.md`, `LICENSE`, and `config.example.php`. It never
+overwrites `config.php`, `storage/`, or `vendor/`.
 
 ## Local Development
 

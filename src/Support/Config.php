@@ -39,6 +39,12 @@ final class Config
         return is_numeric($value) ? (int) $value : $default;
     }
 
+    public function bool(string $key, bool $default): bool
+    {
+        $value = $this->values[$key] ?? $default;
+        return is_bool($value) ? $value : $default;
+    }
+
     /** @return array<string, mixed> */
     public function matomo(): array
     {
