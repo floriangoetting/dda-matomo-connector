@@ -40,6 +40,11 @@ On Apache shared hosting, keep `public/.htaccess` uploaded. It sets
 `/v1/health` to the connector front controller. Without it, only direct URLs
 such as `/index.php` may work.
 
+If the host does not allow rewrite rules, use the explicit front-controller URL
+instead. For example, set the Drag & Drop Analytics connector URL to
+`https://connector.example.com/index.php`; DDA will then call endpoints such as
+`https://connector.example.com/index.php/v1/health`.
+
 ## Security Model
 
 Drag & Drop Analytics signs connector requests with HMAC-SHA256.
