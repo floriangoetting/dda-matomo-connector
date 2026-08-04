@@ -21,7 +21,10 @@ Implemented endpoints:
 - HTTPS in production
 - A read-only MySQL user for the Matomo database
 
-## Installation
+## Shared Hosting Installation
+
+Docker is not required. The connector remains a regular PHP application for
+Apache-compatible shared hosting:
 
 1. Upload this repository to your web hosting account.
 2. Point the web root to `public/`.
@@ -46,6 +49,95 @@ If the host does not allow rewrite rules, use the explicit front-controller URL
 instead. For example, set the Drag & Drop Analytics connector URL to
 `https://connector.example.com/index.php`; DDA will then call endpoints such as
 `https://connector.example.com/index.php/v1/health`.
+
+## Docker Installation
+
+Docker is an additional supported deployment option for users who operate
+Matomo on a Docker host or another container platform. It does not replace the
+shared-hosting installation above. The image contains Apache, PHP 8.3, PDO
+MySQL, and the connector application.
+
+The container does not use the browser setup wizard. On every start it creates
+`config.php` from environment metadata and mounted secret files. Prepare the
+secret files locally:
+
+```bash
+install -m 0700 -d secrets
+openssl rand -hex 48 > secrets/connector_shared_secret
+openssl rand -hex 32 > secrets/connector_admin_token
+printf '%s' 'the-password-of-your-read-only-matomo-user' > secrets/matomo_readonly_password
+chmod 0600 secrets/*
+printf 'DDA_CONNECTOR_ID=conn_%s\n' "$(openssl rand -hex 8)" > .env
+printf '%s\n' 'MATOMO_DOCKER_NETWORK=your-matomo-network' >> .env
+```
+
+The Matomo password must belong to an existing database user that has only
+`SELECT` privileges on the Matomo database. Keep all three secret files out of
+Git.
+
+Add the connector to a Compose project that can reach the Matomo database. The
+following example expects an existing external Docker network named in
+`MATOMO_DOCKER_NETWORK` and a database container reachable as `matomo-db`:
+
+```yaml
+services:
+  dda-matomo-connector:
+    build:
+      context: .
+    image: dda-matomo-connector:0.3.0
+    restart: unless-stopped
+    environment:
+      DDA_CONNECTOR_ID: ${DDA_CONNECTOR_ID:?DDA_CONNECTOR_ID must be set}
+      DDA_CONNECTOR_SHARED_SECRET_FILE: /run/secrets/connector_shared_secret
+      DDA_CONNECTOR_ADMIN_TOKEN_FILE: /run/secrets/connector_admin_token
+      MATOMO_DATABASE_HOST: ${MATOMO_DATABASE_HOST:-matomo-db}
+      MATOMO_DATABASE_PORT: ${MATOMO_DATABASE_PORT:-3306}
+      MATOMO_DATABASE_DBNAME: ${MATOMO_DATABASE_DBNAME:-matomo}
+      MATOMO_DATABASE_USERNAME: ${MATOMO_DATABASE_USERNAME:-matomo_readonly}
+      MATOMO_DATABASE_PASSWORD_FILE: /run/secrets/matomo_readonly_password
+    ports:
+      - "127.0.0.1:8091:80"
+    volumes:
+      - connector_storage:/var/www/html/storage
+      - ./secrets/connector_shared_secret:/run/secrets/connector_shared_secret:ro
+      - ./secrets/connector_admin_token:/run/secrets/connector_admin_token:ro
+      - ./secrets/matomo_readonly_password:/run/secrets/matomo_readonly_password:ro
+    networks:
+      - matomo
+    healthcheck:
+      test: ["CMD-SHELL", "php -r '$$body = @file_get_contents(\"http://127.0.0.1/v1/health\"); exit($$body !== false && str_contains($$body, \"ok\") ? 0 : 1);'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  connector_storage:
+
+networks:
+  matomo:
+    external: true
+    name: ${MATOMO_DOCKER_NETWORK:?MATOMO_DOCKER_NETWORK must be set}
+```
+
+Build and start it with:
+
+```bash
+docker compose build --pull dda-matomo-connector
+docker compose up -d dda-matomo-connector
+docker compose ps dda-matomo-connector
+```
+
+Keep port `8091` bound to loopback and publish it through an existing HTTPS
+reverse proxy, or connect the reverse proxy directly to the same Docker
+network. Configure the resulting HTTPS URL as the connector URL in Drag & Drop
+Analytics, together with the connector ID from `.env` and the exact shared
+secret stored in `secrets/connector_shared_secret`. Never expose the Matomo
+database port for this purpose.
+
+Container updates are performed by checking out the desired connector release,
+rebuilding the image, and recreating the service. Browser-based self-updates
+remain disabled in the container runtime so that application files continue to
+come from the immutable image.
 
 ## Security Model
 
@@ -179,6 +271,12 @@ Or without Composer:
 
 ```bash
 find public src -name '*.php' -print0 | xargs -0 -n1 php -l
+```
+
+Build the optional Docker runtime:
+
+```bash
+docker build -t dda-matomo-connector:0.3.0 .
 ```
 
 ## License
