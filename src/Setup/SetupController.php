@@ -34,6 +34,9 @@ final class SetupController
         $sharedSecret = $values['shared_secret'] ?? bin2hex(random_bytes(32));
         $adminToken = $values['admin_token'] ?? bin2hex(random_bytes(24));
         $storagePath = $values['storage_path'] ?? $this->basePath . '/storage/nonces.json';
+        $allowSelfUpdate = array_key_exists('allow_self_update', $values)
+            ? (bool) $values['allow_self_update']
+            : true;
 
         $errorHtml = $error === '' ? '' : '<div class="alert alert-danger">' . $this->escape($error) . '</div>';
         $successHtml = $success === '' ? '' : '<div class="alert alert-success">' . $this->escape($success) . '</div>';
@@ -53,7 +56,7 @@ final class SetupController
                 ' . $this->input('matomo_password', 'Password', $values['matomo_password'] ?? '', 'password') . '
                 <h2>Updates</h2>
                 <p>The connector uses the official Drag &amp; Drop Analytics release service. Version checks do not require connector internet access; browser-based updates download a verified package only when you explicitly apply one.</p>
-                <label class="checkbox"><input type="checkbox" name="allow_self_update" value="1"' . (!empty($values['allow_self_update']) ? ' checked' : '') . '> Enable browser-based connector updates</label>
+                <label class="checkbox"><input type="checkbox" name="allow_self_update" value="1"' . ($allowSelfUpdate ? ' checked' : '') . '> Enable browser-based connector updates</label>
                 <div class="actions">
                     <button type="submit" name="setup_action" value="test">Test Matomo Connection</button>
                     <button type="submit" name="setup_action" value="save">Create config.php</button>

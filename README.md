@@ -222,7 +222,8 @@ The wizard writes a PHP config file with:
 - nonce storage path
 - Matomo database connection
 - Matomo table prefix, validated as 1–43 letters, numbers or underscores
-- optional permission for browser-based connector updates
+- browser-based connector updates, enabled by default and available as an
+  explicit one-click admin action
 
 The admin token is only shown during setup. It is required for browser-based
 update checks at `GET /admin/update`.
