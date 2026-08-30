@@ -7,12 +7,6 @@ use PDO;
 
 final class MatomoCatalogService
 {
-    private const TABLES = [
-        'matomo_log_link_visit_action',
-        'matomo_log_visit',
-        'matomo_log_action',
-    ];
-
     public function __construct(private Config $config)
     {
     }
@@ -20,9 +14,14 @@ final class MatomoCatalogService
     /** @return array<string, mixed> */
     public function loadCatalog(): array
     {
+        $pdo = $this->pdo();
+        $schema = MatomoSchema::fromConfig($this->config);
+        $schema->assertRequiredTablesReadable($pdo);
+
         return [
-            'sites' => $this->loadSites(),
-            'availableColumns' => $this->loadAvailableColumns(),
+            'tablePrefix' => $schema->prefix(),
+            'sites' => $this->loadSites($pdo, $schema),
+            'availableColumns' => $this->loadAvailableColumns($pdo, $schema),
         ];
     }
 
@@ -48,14 +47,10 @@ final class MatomoCatalogService
     }
 
     /** @return list<array{id:int,title:string,mainUrl:string}> */
-    private function loadSites(): array
+    private function loadSites(PDO $pdo, MatomoSchema $schema): array
     {
-        try {
-            $statement = $this->pdo()->query('SELECT idsite, name, main_url FROM matomo_site ORDER BY name ASC, idsite ASC');
-            $rows = $statement === false ? [] : $statement->fetchAll();
-        } catch (\Throwable $error) {
-            return [];
-        }
+        $statement = $pdo->query('SELECT idsite, name, main_url FROM ' . $schema->quotedTable('site') . ' ORDER BY name ASC, idsite ASC');
+        $rows = $statement === false ? [] : $statement->fetchAll();
 
         $sites = [];
         foreach ($rows as $row) {
@@ -75,18 +70,25 @@ final class MatomoCatalogService
     }
 
     /** @return array<string, list<string>> */
-    private function loadAvailableColumns(): array
+    private function loadAvailableColumns(PDO $pdo, MatomoSchema $schema): array
     {
         $matomo = $this->config->matomo();
         $database = (string) ($matomo['database'] ?? '');
-        $placeholders = implode(',', array_fill(0, count(self::TABLES), '?'));
+        $catalogTables = $schema->catalogTables();
+        $physicalTables = array_keys($catalogTables);
+        $canonicalTablesByLowerName = [];
+        foreach ($catalogTables as $physicalTable => $canonicalTable) {
+            $canonicalTablesByLowerName[strtolower($physicalTable)] = $canonicalTable;
+        }
+        $placeholders = implode(',', array_fill(0, count($physicalTables), '?'));
         $sql = "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ($placeholders)";
-        $statement = $this->pdo()->prepare($sql);
-        $statement->execute([$database, ...self::TABLES]);
+        $statement = $pdo->prepare($sql);
+        $statement->execute([$database, ...$physicalTables]);
 
         $availableColumns = [];
         foreach ($statement->fetchAll() as $row) {
-            $table = strtolower((string) ($row['TABLE_NAME'] ?? ''));
+            $physicalTable = strtolower((string) ($row['TABLE_NAME'] ?? ''));
+            $table = $canonicalTablesByLowerName[$physicalTable] ?? '';
             $column = strtolower((string) ($row['COLUMN_NAME'] ?? ''));
             if ($table === '' || $column === '') {
                 continue;

@@ -9,14 +9,6 @@ final class MatomoQueryService
 {
     private const PLAN_TYPE = 'matomo.mysql.queryPlan.v1';
 
-    private const ALLOWED_TABLES = [
-        'matomo_log_link_visit_action',
-        'matomo_log_visit',
-        'matomo_log_action',
-        'matomo_site',
-        'information_schema.columns',
-    ];
-
     public function __construct(private Config $config)
     {
     }
@@ -165,6 +157,7 @@ final class MatomoQueryService
 
     private function validateTables(string $sql, string $name): void
     {
+        $allowedTables = array_map('strtolower', MatomoSchema::fromConfig($this->config)->allowedTables());
         preg_match_all('/\b(?:FROM|JOIN)\s+((?:`?[A-Za-z0-9_]+`?\.)?`?[A-Za-z0-9_]+`?|\()/i', $sql, $matches);
         foreach ($matches[1] as $identifier) {
             if ($identifier === '(') {
@@ -172,7 +165,7 @@ final class MatomoQueryService
             }
 
             $normalized = strtolower(str_replace('`', '', $identifier));
-            if (!in_array($normalized, self::ALLOWED_TABLES, true)) {
+            if (!in_array($normalized, $allowedTables, true)) {
                 throw new \InvalidArgumentException("queryPlan.queries.$name.sql references a disallowed table.");
             }
         }

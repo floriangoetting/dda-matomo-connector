@@ -2,6 +2,7 @@
 
 namespace DDA\MatomoConnector\Setup;
 
+use DDA\MatomoConnector\Matomo\MatomoSchema;
 use DDA\MatomoConnector\Support\ConfigWriter;
 use DDA\MatomoConnector\Support\Version;
 use PDO;
@@ -47,6 +48,7 @@ final class SetupController
                 ' . $this->input('matomo_host', 'MySQL Host', $values['matomo_host'] ?? '127.0.0.1') . '
                 ' . $this->input('matomo_port', 'MySQL Port', $values['matomo_port'] ?? '3306', 'number') . '
                 ' . $this->input('matomo_database', 'Database', $values['matomo_database'] ?? 'matomo') . '
+                ' . $this->input('matomo_table_prefix', 'Matomo Table Prefix', $values['matomo_table_prefix'] ?? MatomoSchema::DEFAULT_PREFIX) . '
                 ' . $this->input('matomo_username', 'Read-only Username', $values['matomo_username'] ?? '') . '
                 ' . $this->input('matomo_password', 'Password', $values['matomo_password'] ?? '', 'password') . '
                 <h2>Updates</h2>
@@ -71,6 +73,7 @@ final class SetupController
             'matomo_host' => $this->post('matomo_host'),
             'matomo_port' => $this->post('matomo_port'),
             'matomo_database' => $this->post('matomo_database'),
+            'matomo_table_prefix' => $this->post('matomo_table_prefix'),
             'matomo_username' => $this->post('matomo_username'),
             'matomo_password' => $this->post('matomo_password'),
             'update_manifest_url' => $this->post('update_manifest_url'),
@@ -102,6 +105,7 @@ final class SetupController
                     'host' => $values['matomo_host'],
                     'port' => (int) $values['matomo_port'],
                     'database' => $values['matomo_database'],
+                    'table_prefix' => MatomoSchema::validatePrefix($values['matomo_table_prefix']),
                     'username' => $values['matomo_username'],
                     'password' => $values['matomo_password'],
                     'charset' => 'utf8mb4',
@@ -127,7 +131,7 @@ final class SetupController
     /** @param array<string, mixed> $values */
     private function validate(array $values): void
     {
-        foreach (['connector_id', 'shared_secret', 'admin_token', 'storage_path', 'matomo_host', 'matomo_database', 'matomo_username'] as $key) {
+        foreach (['connector_id', 'shared_secret', 'admin_token', 'storage_path', 'matomo_host', 'matomo_database', 'matomo_table_prefix', 'matomo_username'] as $key) {
             if (trim((string) $values[$key]) === '') {
                 throw new \InvalidArgumentException("$key is required.");
             }
@@ -137,6 +141,7 @@ final class SetupController
         if ($port < 1 || $port > 65535) {
             throw new \InvalidArgumentException('matomo_port must be between 1 and 65535.');
         }
+        MatomoSchema::validatePrefix((string) $values['matomo_table_prefix']);
     }
 
     /** @param array<string, mixed> $values */
@@ -151,7 +156,7 @@ final class SetupController
         $pdo = new PDO($dsn, (string) $values['matomo_username'], (string) $values['matomo_password'], [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         ]);
-        $pdo->query('SELECT 1');
+        (new MatomoSchema((string) $values['matomo_table_prefix']))->assertRequiredTablesReadable($pdo);
     }
 
     private function prepareStorage(string $storagePath): void

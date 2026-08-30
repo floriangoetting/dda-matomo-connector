@@ -33,9 +33,10 @@ Apache-compatible shared hosting:
 5. Store the generated connector id, shared secret, and admin token.
 6. In Drag & Drop Analytics, create a Matomo HTTP Connector Data Source with the connector URL, connector id, and shared secret.
 
-The setup wizard can test the Matomo MySQL connection before saving. It also
-tests the connection again when creating `config.php`, creates the nonce storage
-directory, and writes the config file only after the connection succeeds. Once
+The setup wizard asks for the Matomo table prefix (default `matomo_`) and tests
+read access to the required Matomo tables before saving. It repeats that test
+when creating `config.php`, creates the nonce storage directory, and writes the
+config file only after the connection and table checks succeed. Once
 `config.php` exists, the setup wizard is disabled. Manual setup is still
 possible by copying `config.example.php` to `config.php` and editing the values
 directly.
@@ -84,7 +85,7 @@ services:
   dda-matomo-connector:
     build:
       context: .
-    image: dda-matomo-connector:0.3.0
+    image: dda-matomo-connector:0.4.0
     restart: unless-stopped
     environment:
       DDA_CONNECTOR_ID: ${DDA_CONNECTOR_ID:?DDA_CONNECTOR_ID must be set}
@@ -93,6 +94,7 @@ services:
       MATOMO_DATABASE_HOST: ${MATOMO_DATABASE_HOST:-matomo-db}
       MATOMO_DATABASE_PORT: ${MATOMO_DATABASE_PORT:-3306}
       MATOMO_DATABASE_DBNAME: ${MATOMO_DATABASE_DBNAME:-matomo}
+      MATOMO_DATABASE_TABLES_PREFIX: ${MATOMO_DATABASE_TABLES_PREFIX:-matomo_}
       MATOMO_DATABASE_USERNAME: ${MATOMO_DATABASE_USERNAME:-matomo_readonly}
       MATOMO_DATABASE_PASSWORD_FILE: /run/secrets/matomo_readonly_password
     ports:
@@ -204,7 +206,7 @@ Query safety gates:
 - accepted plan type: `matomo.mysql.queryPlan.v1`
 - only `SELECT` statements
 - no semicolons, SQL comments, multi-statements, writes, DDL, `UNION`, or file operations
-- allowed tables only: `matomo_log_link_visit_action`, `matomo_log_visit`, `matomo_log_action`, `matomo_site`, `information_schema.COLUMNS`
+- allowed tables only: the configured-prefix variants of `log_link_visit_action`, `log_visit`, `log_action`, `site`, plus `information_schema.COLUMNS`
 - placeholder count must match bound parameters
 - row query must end with `LIMIT n OFFSET n`
 - `LIMIT` must not exceed `max_query_rows`
@@ -219,6 +221,7 @@ The wizard writes a PHP config file with:
 - admin token hash
 - nonce storage path
 - Matomo database connection
+- Matomo table prefix, validated as 1–43 letters, numbers or underscores
 - optional update manifest URL
 - optional self-update permission
 
@@ -238,9 +241,9 @@ Configure `update_manifest_url` with a JSON manifest:
 
 ```json
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "minimumPhpVersion": "8.1.0",
-  "downloadUrl": "https://updates.example.com/dda-matomo-connector-0.3.0.zip",
+  "downloadUrl": "https://updates.example.com/dda-matomo-connector-0.4.0.zip",
   "sha256": "hex-encoded-sha256",
   "releaseNotesUrl": "https://updates.example.com/dda-matomo-connector/0.3.0"
 }
@@ -267,6 +270,12 @@ Run PHP syntax checks:
 composer run lint
 ```
 
+Run the schema and query-allowlist regression test:
+
+```bash
+composer run test
+```
+
 Or without Composer:
 
 ```bash
@@ -276,7 +285,7 @@ find public src -name '*.php' -print0 | xargs -0 -n1 php -l
 Build the optional Docker runtime:
 
 ```bash
-docker build -t dda-matomo-connector:0.3.0 .
+docker build -t dda-matomo-connector:0.4.0 .
 ```
 
 ## License

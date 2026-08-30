@@ -7,6 +7,7 @@ use DDA\MatomoConnector\Http\JsonResponse;
 use DDA\MatomoConnector\Http\Request;
 use DDA\MatomoConnector\Matomo\MatomoCatalogService;
 use DDA\MatomoConnector\Matomo\MatomoQueryService;
+use DDA\MatomoConnector\Matomo\MatomoSchema;
 use DDA\MatomoConnector\Support\Config;
 use DDA\MatomoConnector\Support\Version;
 use DDA\MatomoConnector\Setup\SetupController;
@@ -84,6 +85,7 @@ try {
             'supportsUpdateCheck' => true,
             'supportsSelfUpdate' => $config->bool('allow_self_update', false),
             'supportsSqlTemplates' => false,
+            'tablePrefix' => MatomoSchema::fromConfig($config)->prefix(),
             'maxLimit' => 400,
         ]);
         return;

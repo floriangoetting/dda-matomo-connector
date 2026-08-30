@@ -24,6 +24,15 @@ function requiredSecret(string $name): string
     return $value;
 }
 
+function matomoTablePrefix(): string
+{
+    $prefix = trim((string) (getenv('MATOMO_DATABASE_TABLES_PREFIX') ?: 'matomo_'));
+    if ($prefix === '' || strlen($prefix) > 43 || !preg_match('/\A[A-Za-z0-9_]+\z/', $prefix)) {
+        throw new RuntimeException('MATOMO_DATABASE_TABLES_PREFIX must contain 1 to 43 letters, numbers or underscores.');
+    }
+    return $prefix;
+}
+
 $basePath = '/var/www/html';
 $config = [
     'connector_id' => requiredEnvironment('DDA_CONNECTOR_ID'),
@@ -40,6 +49,7 @@ $config = [
         'host' => requiredEnvironment('MATOMO_DATABASE_HOST'),
         'port' => (int) (getenv('MATOMO_DATABASE_PORT') ?: 3306),
         'database' => requiredEnvironment('MATOMO_DATABASE_DBNAME'),
+        'table_prefix' => matomoTablePrefix(),
         'username' => requiredEnvironment('MATOMO_DATABASE_USERNAME'),
         'password' => requiredSecret('MATOMO_DATABASE_PASSWORD'),
         'charset' => 'utf8mb4',

@@ -15,6 +15,7 @@ return [
         'host' => '127.0.0.1',
         'port' => 3306,
         'database' => 'matomo',
+        'table_prefix' => 'matomo_',
         'username' => 'matomo_readonly',
         'password' => 'replace-me',
         'charset' => 'utf8mb4',
