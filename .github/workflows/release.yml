@@ -1,0 +1,57 @@
+name: Release Connector
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate and test release
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          source_version="$(php -r 'require "src/Support/Version.php"; echo DDA\MatomoConnector\Support\Version::CONNECTOR;')"
+          test "$version" = "$source_version"
+          php tests/MatomoSchemaTest.php
+          php tests/UpdateServiceTest.php
+
+      - name: Build release package and manifest
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          package="dda-matomo-connector-${version}.zip"
+          git archive --format=zip --output="$package" --prefix="dda-matomo-connector-${version}/" HEAD
+          sha256="$(sha256sum "$package" | awk '{ print $1 }')"
+          PACKAGE="$package" VERSION="$version" SHA256="$sha256" php -r '
+            $repository = getenv("GITHUB_REPOSITORY");
+            $tag = getenv("GITHUB_REF_NAME");
+            $base = "https://github.com/{$repository}/releases";
+            $manifest = [
+              "version" => getenv("VERSION"),
+              "minimumPhpVersion" => "8.1.0",
+              "downloadUrl" => "{$base}/download/{$tag}/" . getenv("PACKAGE"),
+              "sha256" => getenv("SHA256"),
+              "releaseNotesUrl" => "{$base}/tag/{$tag}",
+            ];
+            file_put_contents("manifest.json", json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+          '
+          sha256sum "$package" > SHA256SUMS
+
+      - name: Publish immutable release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dda-matomo-connector-*.zip
+            manifest.json
+            SHA256SUMS

@@ -2,7 +2,7 @@
 
 Shared-hosting friendly Matomo connector for Drag & Drop Analytics.
 
-This connector runs in the customer's infrastructure. It lets Drag & Drop Analytics query local Matomo MySQL metadata and execute signed read-only query plans without sending database credentials to the SaaS backend.
+This connector runs in the customer's infrastructure. It lets Drag & Drop Analytics query local Matomo MySQL metadata and execute signed read-only query plans without sending database credentials to the central application.
 
 ## Status
 
@@ -222,45 +222,53 @@ The wizard writes a PHP config file with:
 - nonce storage path
 - Matomo database connection
 - Matomo table prefix, validated as 1–43 letters, numbers or underscores
-- optional update manifest URL
-- optional self-update permission
+- optional permission for browser-based connector updates
 
 The admin token is only shown during setup. It is required for browser-based
 update checks at `GET /admin/update`.
 
 ## Updates
 
-The connector exposes its running version through `/v1/health`,
-`/v1/capabilities`, and `/v1/update-check`.
+The connector exposes its installed version through `/v1/health` and
+`/v1/capabilities`. Drag & Drop Analytics compares that version with the
+official release manifest on its own server. The customer connector therefore
+does not need outbound internet access for version detection.
 
-`GET /v1/update-check` is HMAC-authenticated and intended for Drag & Drop
-Analytics. It returns the current version, the latest version from the configured
-manifest, and whether an update is available.
-
-Configure `update_manifest_url` with a JSON manifest:
+The setup wizard uses the official Drag & Drop Analytics release manifest by
+default. A custom HTTPS `update_manifest_url` can still be set directly in
+`config.php` for a maintained fork. The manifest format is:
 
 ```json
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "minimumPhpVersion": "8.1.0",
-  "downloadUrl": "https://updates.example.com/dda-matomo-connector-0.4.0.zip",
+  "downloadUrl": "https://github.com/floriangoetting/dda-matomo-connector/releases/download/v0.5.0/dda-matomo-connector-0.5.0.zip",
   "sha256": "hex-encoded-sha256",
-  "releaseNotesUrl": "https://updates.example.com/dda-matomo-connector/0.3.0"
+  "releaseNotesUrl": "https://github.com/floriangoetting/dda-matomo-connector/releases/tag/v0.5.0"
 }
 ```
 
 Browser-based update checks are available at `GET /admin/update` and require the
-admin token. Applying updates requires:
+admin token. The connector contacts the manifest and package hosts only after an
+administrator explicitly checks or applies an update there. Applying updates
+requires:
 
 - `allow_self_update` set to `true`
 - PHP `ZipArchive`
 - writable connector files
 - a manifest with `downloadUrl` and `sha256`
 
-The updater verifies the ZIP hash, extracts the package, backs up the current
-runtime files under `storage/updates/`, and replaces `public/`, `src/`,
+The updater requires HTTPS, verifies the ZIP hash, rejects unsafe archive paths
+and symbolic links, extracts the package, backs up the current runtime files
+under `storage/updates/`, and replaces `public/`, `src/`,
 `composer.json`, `README.md`, `LICENSE`, and `config.example.php`. It never
 overwrites `config.php`, `storage/`, or `vendor/`.
+
+`GET /v1/update-check` remains available for older Drag & Drop Analytics
+versions, but current versions no longer call it for normal update detection.
+Container images are immutable deployments, so browser-based file replacement
+is disabled in the provided Docker runtime. Update the pinned image revision
+through the deployment workflow instead.
 
 ## Local Development
 

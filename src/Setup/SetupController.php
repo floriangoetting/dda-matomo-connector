@@ -52,8 +52,8 @@ final class SetupController
                 ' . $this->input('matomo_username', 'Read-only Username', $values['matomo_username'] ?? '') . '
                 ' . $this->input('matomo_password', 'Password', $values['matomo_password'] ?? '', 'password') . '
                 <h2>Updates</h2>
-                ' . $this->input('update_manifest_url', 'Update Manifest URL', $values['update_manifest_url'] ?? '') . '
-                <label class="checkbox"><input type="checkbox" name="allow_self_update" value="1"> Allow this connector to apply verified ZIP updates</label>
+                <p>The connector uses the official Drag &amp; Drop Analytics release service. Version checks do not require connector internet access; browser-based updates download a verified package only when you explicitly apply one.</p>
+                <label class="checkbox"><input type="checkbox" name="allow_self_update" value="1"' . (!empty($values['allow_self_update']) ? ' checked' : '') . '> Enable browser-based connector updates</label>
                 <div class="actions">
                     <button type="submit" name="setup_action" value="test">Test Matomo Connection</button>
                     <button type="submit" name="setup_action" value="save">Create config.php</button>
@@ -76,7 +76,7 @@ final class SetupController
             'matomo_table_prefix' => $this->post('matomo_table_prefix'),
             'matomo_username' => $this->post('matomo_username'),
             'matomo_password' => $this->post('matomo_password'),
-            'update_manifest_url' => $this->post('update_manifest_url'),
+            'update_manifest_url' => '',
             'allow_self_update' => ($_POST['allow_self_update'] ?? '') === '1',
         ];
         $action = $this->post('setup_action') === 'test' ? 'test' : 'save';

@@ -9,6 +9,7 @@ return [
     'nonce_store_ttl_seconds' => 300,
     'query_timeout_ms' => 35000,
     'max_query_rows' => 400,
+    // Leave empty to use the official DDA release manifest. Custom forks may override it with an HTTPS URL.
     'update_manifest_url' => '',
     'allow_self_update' => false,
     'matomo' => [
