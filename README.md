@@ -55,7 +55,7 @@ instead. For example, set the Drag & Drop Analytics connector URL to
 
 Docker is an additional supported deployment option for users who operate
 Matomo on a Docker host or another container platform. It does not replace the
-shared-hosting installation above. The image contains Apache, PHP 8.3, PDO
+shared-hosting installation above. The image contains Apache, PHP 8.5, PDO
 MySQL, and the connector application.
 
 The container does not use the browser setup wizard. On every start it creates
